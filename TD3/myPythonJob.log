@@ -1,0 +1,5 @@
+/var/spool/slurmd/job583187/slurm_script: line 13: /home2/cgmj52/ReinforcementLearning/RL_Kernel/bin/activate: No such file or directory
+Unable to init server: Could not connect: Connection refused
+Unable to init server: Could not connect: Connection refused
+
+(train_RL.py:2887819): Gdk-CRITICAL **: 16:43:49.314: gdk_cursor_new_for_display: assertion 'GDK_IS_DISPLAY (display)' failed

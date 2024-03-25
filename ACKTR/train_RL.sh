@@ -9,7 +9,7 @@
 
 # Create and activate a Python virtual environment
 #python3 -m venv RL_Kernel
-source RL_Kernel/bin/activate
+source /home2/cgmj52/ReinforcementLearning/RL_Kernel/bin/activate
 # Install necessary packages using pip
 #pip install numpy matplotlib gym pyvirtualdisplay
 
@@ -24,7 +24,7 @@ source RL_Kernel/bin/activate
 #pip install 'gym[box2d]==0.20.0'
 #pip install 'pyvirtualdisplay==3.0'
 # Now run Python script
-python3 /home2/cgmj52/ReinforcementLearning/train_RL.py
+python3 train_RL.py
 
 # Deactivate the virtual environment at the end
 deactivate

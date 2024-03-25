@@ -14,7 +14,16 @@ import matplotlib.pyplot as plt
 import sys
 from pyvirtualdisplay import Display
 
-
+# Config
+ENV = "BipedalWalkerHardcore-v3"
+BATCH_SIZE = 100
+DISCOUNT_FACTOR = 0.99
+EXPLORE_POLICY = 0.1
+LEARN_RATE = .001
+POLICY_DELAY = 2
+TAU = 0.005
+NOISE_POLICY = 0.2
+NOISE_CLIP = 0.5
 
 class ExperienceReplay:
 
@@ -82,6 +91,7 @@ class Critic(nn.Module):
         self.l4 = nn.Linear(state_dim + action_dim, 400)
         self.l5 = nn.Linear(400, 300)
         self.l6 = nn.Linear(300, 1)
+
     def forward(self, state, action):
         # Perform forward pass through NN with the given state
         # and the action to take on this state.
@@ -101,17 +111,6 @@ class Critic(nn.Module):
 
         # Return both values so we can grab the min of the two.
         return (c1, c2)
-
-# Config
-ENV = "BipedalWalker-v3"
-BATCH_SIZE = 100
-DISCOUNT_FACTOR = 0.99
-EXPLORE_POLICY = 0.1
-LEARN_RATE = .001
-POLICY_DELAY = 2
-TAU = 0.005
-NOISE_POLICY = 0.2
-NOISE_CLIP = 0.5
 
 class TD3():
     def __init__(self, state_dim, action_dim, max_action, env, device):
