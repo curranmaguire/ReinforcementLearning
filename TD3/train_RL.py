@@ -8,12 +8,11 @@ import torch.nn.functional as F
 import torch.optim as optim
 import matplotlib.pyplot as plt
 import sys
-from pyvirtualdisplay import Display
+
 from TD3 import TD3, ExperienceReplay
 
 print('----------Starting Training----------')
-display = Display(visible=0,size=(600,600))
-display.start()
+
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
 plot_interval = 10 # update the plot every N episodes

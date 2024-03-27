@@ -11,11 +11,10 @@ import torch.optim as optim
 import matplotlib.pyplot as plt
 import sys
 from pyvirtualdisplay import Display
-from TD3_fork import TD3_FORK, ExperienceReplay
+from TD3_fork import TD3_FORK
 
 print('----------Starting Training----------')
-display = Display(visible=0,size=(600,600))
-display.start()
+
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
 plot_interval = 10 # update the plot every N episodes
@@ -58,7 +57,7 @@ env.action_space.seed(seed)
 ep_reward = 0
 reward_list = []
 plot_data = []
-log_f = open("agent-log.txt","w+")
+log_f = open("TD3_FORK/agent-log.txt","w+")
 
 #variables for td3
 state_dim = env.observation_space.shape[0]
@@ -149,5 +148,5 @@ for episode in range(1, max_episodes+1):
         plt.fill_between([x[0] for x in plot_data], [x[1]-x[2] for x in plot_data], [x[1]+x[2] for x in plot_data], alpha=0.2, color='tab:grey')
         plt.xlabel('Episode number')
         plt.ylabel('Episode reward')
-        plt.savefig(f'plots/{episode}_episode_plot.png')
+        plt.savefig(f'TD3_FORK/plots/{episode}_episode_plot.png')
         plt.close()
