@@ -33,7 +33,7 @@ fi
 
 # Now run Python script
 #python3 /home2/cgmj52/ReinforcementLearning/TD3/train_RL.py
-python3 TD3_FORK/train_RL.py
+python3 TD3/train_RL.py
 
 # Deactivate the virtual environment at the end
 deactivate
