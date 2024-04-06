@@ -15,7 +15,12 @@ from TD3_fork import TD3_FORK
 
 print("----------Starting Training----------")
 
-device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+if torch.cuda.is_available():
+    device = torch.device("cuda")
+if torch.backends.mps.is_available():
+    device = torch.device("mps")
+else:
+    torch.device("cpu")
 
 plot_interval = 10  # update the plot every N episodes
 video_every = (
@@ -25,7 +30,7 @@ video_every = (
 
 env = gym.make("BipedalWalkerHardcore-v3")
 agent = TD3_FORK("Bipedalhardcore", env, batch_size=100)
-total_episodes = 100000
+total_episodes = 10000
 start_timestep = 0  # time_step to select action based on Actor
 time_start = time.time()  # Init start time
 ep_reward_list = []
@@ -78,7 +83,7 @@ max_steps = 2000
 falling_down = 0
 # initialise agent
 
-max_episodes = 1000
+max_episodes = 10000
 max_timesteps = 2000
 
 # training procedure:
@@ -169,3 +174,6 @@ for episode in range(1, max_episodes + 1):
         plt.ylabel("Episode reward")
         plt.savefig(f"{os.getcwd()}/TD3_FORK/plots/{episode}_episode_plot.png")
         plt.close()
+
+time_end = time.time()
+print(f"time taken to train: {time_end-time_start} seconds")
