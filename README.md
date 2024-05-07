@@ -29,4 +29,11 @@ TD3 has be benefit of being deep and works over a continuous space however the a
 shows to be the best algorithm in terms of efficiency,
 
 - need to understand how it works
-- need to try transfer learning of the model to help it train more efficiently
+
+transfer learning of the model to help it train more efficiently. We will see if it work.
+
+- look at adapting the training params for the seperate learning envs potentially
+
+-look at a recurrent net https://github.com/zhihanyang2022/off-policy-continuous-control/blob/pub/offpcc/basics/summarizer.py to help
+
+-use this for tips and tricks https://agents.inf.ed.ac.uk/blog/reinforcement-learning-implementation-tricks/
