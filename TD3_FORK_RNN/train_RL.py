@@ -1,4 +1,4 @@
-import copy
+from copy import deepcopy
 import os
 import time
 import gym
@@ -11,26 +11,20 @@ import torch.optim as optim
 import matplotlib.pyplot as plt
 import sys
 from pyvirtualdisplay import Display
-from TD3_fork import TD3_FORK
+from TD3_fork import TD3Agent
+from config import config
+from utils import RecurrentReplayBuffer
+from collections import deque
 
 print("----------Starting Training----------")
 
-if torch.cuda.is_available():
-    device = torch.device("cuda")
-if torch.backends.mps.is_available():
-    device = torch.device("mps")
-else:
-    torch.device("cpu")
-
-plot_interval = 10  # update the plot every N episodes
-video_every = (
-    100  # videos can take a very long time to render so only do it every N episodes
-)
-
 
 env = gym.make("BipedalWalkerHardcore-v3")
-agent = TD3_FORK("Bipedalhardcore", env, batch_size=100)
-total_episodes = 10000
+env_easy = gym.make("BipedalWalker-v3")
+
+
+# ============================variables
+config = config()
 start_timestep = 0  # time_step to select action based on Actor
 time_start = time.time()  # Init start time
 ep_reward_list = []
@@ -41,72 +35,72 @@ numtrainedexp = 0
 save_time = 0
 expcount = 0
 totrain = 0
-env = gym.wrappers.Monitor(
-    env, "./video", video_callable=lambda ep_id: ep_id % video_every == 0, force=True
+# ===========================wrappers
+"""env = gym.wrappers.RecordVideo(
+    env,
+    "./video",
+    episode_trigger=lambda ep_id: ep_id % config.video_every == 0,
 )
+env_easy = gym.wrappers.RecordVideo(
+    env_easy,
+    "./video_easy",
+    episode_trigger=lambda ep_id: ep_id % config.video_every == 0,
+)"""
 
-obs_dim = env.observation_space.shape[0]
-act_dim = env.action_space.shape[0]
-
-print(
-    "The environment has {} observations and the agent can take {} actions".format(
-        obs_dim, act_dim
-    )
-)
-print("The device is: {}".format(device))
-
-if device.type != "cpu":
-    print("It's recommended to train on the cpu for this")
-
-# in the submission please use seed 42 for verification
-seed = 42
-torch.manual_seed(seed)
-env.seed(seed)
-random.seed(seed)
-np.random.seed(seed)
-env.action_space.seed(seed)
-
-# logging variables
+config.state_size = env.observation_space.shape[-1]
+config.action_size = env.action_space.shape[-1]
+config.max_action = float(env.action_space.high[0])
+# ==========================seeding
+torch.manual_seed(config.seed)
+env.seed(config.seed)
+env_easy.seed(config.seed)
+random.seed(config.seed)
+np.random.seed(config.seed)
+env.action_space.seed(config.seed)
+env_easy.action_space.seed(config.seed)
+# =========================logging variables
 ep_reward = 0
 reward_list = []
 plot_data = []
-log_f = open("TD3_FORK/agent-log.txt", "w+")
+log_f = open("agent-log.txt", "w+")
 
-# variables for td3
-state_dim = env.observation_space.shape[0]
-action_dim = env.action_space.shape[0]
-max_action = float(env.action_space.high[0])
-buffer_size = 1000000
-batch_size = 300
-noise = 0.1
-max_steps = 2000
+# =========================variables for td3 RNN
+episode_len = 0
+episode_ret = 0
+train_episode_lens = []
+train_episode_rets = []
+algo_specific_stats_tracker = []
+
+config.max_action = float(env.action_space.high[0])
 falling_down = 0
-# initialise agent
 
-max_episodes = 10000
-max_timesteps = 2000
 
+agent = TD3Agent(
+    config,
+    clip_low=-1,
+    clip_high=+1,
+)
+scores_deque = deque(maxlen=100)
+scores = []
+test_scores = []
+max_score = -np.Inf
+print("-----------------beginning training")
 # training procedure:
-for episode in range(1, max_episodes + 1):
-
+for episode in range(1, config.max_episodes + 1):
     state = env.reset()
-    episodic_reward = 0
-    timestep = 0
-    temp_replay_buffer = []
+    score = 0
+    done = False
+    agent.train_mode()
+    t = int(0)
+    while not done and t < config.max_timesteps:
+        t += int(1)
+        action = agent.get_action(state, explore=True)
+        action = action.clip(min=env.action_space.low, max=env.action_space.high)
+        next_state, reward, done, info = env.step(action)
 
-    for st in range(max_timesteps):
-
-        # select the agent action + add noise
-        action = agent.select_action(state) + np.random.normal(
-            0, max_action * noise, size=action_dim
-        )
-        action = action.clip(env.action_space.low, env.action_space.high)
-
-        # take action in environment and get r and s'
-        next_state, reward, done, _ = env.step(action)
-        ep_reward += reward
-        # change the reward to be -5 instead of -100 and 5*reward for the other values
-        episodic_reward += reward
+        state = next_state
+        score += reward
+        episode_len += 1
         if reward == -100:
             add_reward = -1
             reward = -5
@@ -116,52 +110,36 @@ for episode in range(1, max_episodes + 1):
             add_reward = 0
             reward = 5 * reward
 
-        temp_replay_buffer.append((state, action, reward, add_reward, next_state, done))
+        agent.memory.add(state, action, reward, next_state, done)
 
-        state = next_state
-
+        agent.step_end()
         env.render()
+    if episode > config.explore_duration:
+        agent.episode_end()
+        for i in range(t):
+            agent.learn_one_step()
+    scores_deque.append(score)
+    avg_score_100 = np.mean(scores_deque)
+    scores.append((episode, score, avg_score_100))
+    reward_list.append(score)
+    print(
+        "\rEpisode {}\tAverage Score: {:.2f}\tScore: {:.2f}".format(
+            episode, avg_score_100, score
+        ),
+        end="",
+    )
 
-        # stop iterating when the episode finished
-        if done:
-            ep_reward_list.append(episodic_reward)
-            if add_reward == -1 or episodic_reward < 250:
-                totrain = 1
-                for temp in temp_replay_buffer:
-                    agent.add_to_replay_memory(temp, agent.replay_memory_buffer)
-            elif expcount > 0 and np.random.rand() > 0.5:
-                totrain = 1
-                expcount -= 10
-                for temp in temp_replay_buffer:
-                    agent.add_to_replay_memory(temp, agent.replay_memory_buffer)
-            break
-        timestep += 1
-        total_timesteps += 1
-    # Training agent only when new experiences are added to the replay buffer
-    weight = 1 - np.clip(np.mean(ep_reward_list[-100:]) / 300, 0, 1)
-    if totrain == 1:
-        sys_loss = agent.learn_and_update_weights_by_replay(timestep, weight, totrain)
-    else:
-        sys_loss = agent.learn_and_update_weights_by_replay(100, weight, totrain)
-    totrain = 0
-
-    # append the episode reward to the reward list
-    reward_list.append(ep_reward)
-
-    # do NOT change this logging code - it is used for automated marking!
-    log_f.write("episode: {}, reward: {}\n".format(episode, ep_reward))
-    log_f.flush()
-    ep_reward = 0
-
-    # print reward data every so often - add a graph like this in your report
-    if episode % plot_interval == 0:
+    if episode % config.plot_interval == 0:
         plot_data.append(
             [episode, np.array(reward_list).mean(), np.array(reward_list).std()]
         )
         reward_list = []
         # plt.rcParams['figure.dpi'] = 100
         plt.plot(
-            [x[0] for x in plot_data], [x[1] for x in plot_data], "-", color="tab:grey"
+            [x[0] for x in plot_data],
+            [x[1] for x in plot_data],
+            "-",
+            color="tab:grey",
         )
         plt.fill_between(
             [x[0] for x in plot_data],
@@ -172,8 +150,15 @@ for episode in range(1, max_episodes + 1):
         )
         plt.xlabel("Episode number")
         plt.ylabel("Episode reward")
-        plt.savefig(f"{os.getcwd()}/TD3_FORK/plots/{episode}_episode_plot.png")
+        plt.savefig(f"plots/{episode}_episode_plot.png")
         plt.close()
+        reward_list.append(ep_reward)
+        # do NOT change this logging code - it is used for automated marking!
+        log_f.write("episode: {}, reward: {}\n".format(episode, score))
+        log_f.flush()
+        ep_reward = 0
+        total_timesteps += 1
+
 
 time_end = time.time()
 print(f"time taken to train: {time_end-time_start} seconds")

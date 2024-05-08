@@ -92,7 +92,7 @@ class TD3_FORK:
         batch_size=100,
         buffer_capacity=1000000,
         tau=0.02,  # target network update factor
-        random_seed=42,
+        random_seed=np.random.randint(1, 10000),
         cuda=True,
         policy_noise=0.2,
         std_noise=0.1,

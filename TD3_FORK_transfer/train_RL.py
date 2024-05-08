@@ -19,7 +19,7 @@ print("----------Starting Training----------")
 
 env = gym.make("BipedalWalkerHardcore-v3")
 env_easy = gym.make("BipedalWalker-v3")
-agent = TD3_FORK("Bipedalhardcore", env, batch_size=config.batch_size)
+agent = TD3_FORK("Bipedalhardcore", env, config.batch_size=config.config.batch_size)
 
 # ============================variables
 config = config()
@@ -57,51 +57,32 @@ random.seed(config.seed)
 np.random.seed(config.seed)
 env.action_space.seed(config.seed)
 env_easy.action_space.seed(config.seed)
-
-
-print(
-    "The environment has {} observations and the agent can take {} actions".format(
-        obs_dim, act_dim
-    )
-)
-print("The device is: {}".format(config.device))
-
-if config.device.type != "cpu":
-    print("It's recommended to train on the cpu for this")
-
-
-# logging variables
+# =========================logging variables
 ep_reward = 0
 reward_list = []
 plot_data = []
 log_f = open("TD3_FORK_RNN/agent-log.txt", "w+")
 
-# variables for td3
+# =========================variables for td3
 state_dim = env.observation_space.shape[0]
 action_dim = env.action_space.shape[0]
 max_action = float(env.action_space.high[0])
-buffer_size = 1000000
-batch_size = 300
-noise = 0.1
 falling_down = 0
-# initialise agent
 
-max_timesteps = 2000
-easy_ep_num = 100
-
+print('-----------------beginning training')
 # training procedure:
 for episode in range(1, config.max_episodes + 1):
-    if episode < easy_ep_num:
+    if episode < config.easy_ep_num:
         state = env_easy.reset()
         episodic_reward = 0
         timestep = 0
         temp_replay_buffer = []
 
-        for st in range(max_timesteps):
+        for st in range(config.max_timesteps):
 
-            # select the agent action + add noise
+            # select the agent action + add config.noise
             action = agent.select_action(state) + np.random.normal(
-                0, max_action * noise, size=action_dim
+                0, max_action * config.noise, size=action_dim
             )
             action = action.clip(env_easy.action_space.low, env_easy.action_space.high)
 
@@ -183,7 +164,7 @@ for episode in range(1, config.max_episodes + 1):
             plt.xlabel("Episode number")
             plt.ylabel("Episode reward")
             plt.savefig(
-                f"{os.getcwd()}/TD3_FORK_transfer/plots/{episode}_episode_plot.png"
+                f"{os.getcwd()}/TD3_FORK_RNN/plots/{episode}_episode_plot.png"
             )
             plt.close()
     else:
@@ -192,11 +173,11 @@ for episode in range(1, config.max_episodes + 1):
         timestep = 0
         temp_replay_buffer = []
 
-        for st in range(max_timesteps):
+        for st in range(config.max_timesteps):
 
-            # select the agent action + add noise
+            # select the agent action + add config.noise
             action = agent.select_action(state) + np.random.normal(
-                0, max_action * noise, size=action_dim
+                0, max_action * config.noise, size=action_dim
             )
             action = action.clip(env.action_space.low, env.action_space.high)
 

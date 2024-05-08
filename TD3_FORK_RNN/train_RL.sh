@@ -9,11 +9,11 @@
 #SBATCH --output=TD3_FORK/myPythonJob.log # Standard output and error log
 
 # Create and activate a Python virtual environment
-python3 -m venv RL_Kernel
 
-source /home2/cgmj52/ReinforcementLearning/RL_Kernel/bin/activate
+
+source RL_Kernel/bin/activate
 # Install necessary packages using pip
-pip install numpy matplotlib gym pyvirtualdisplay
+'''pip install numpy matplotlib gym pyvirtualdisplay
 pip install torch torchvision
 # For PyTorch, use the correct pip command from the PyTorch website, assuming CPU-only here
 pip install torch torchvision torchaudio
@@ -24,9 +24,9 @@ apt install xvfb -y
 pip install 'swig'
 pip install 'pyglet==1.5.27'
 pip install 'pyvirtualdisplay==3.0'
-pip install 'gym[box2d]==0.20.0'
+pip install 'gym[box2d]==0.20.0''''
 # Now run Python script
-python3 /home2/cgmj52/ReinforcementLearning/TD3_FORK/train_RL.py
+python3 train_RL.py
 
 # Deactivate the virtual environment at the end
-deactivate
+source deactivate
