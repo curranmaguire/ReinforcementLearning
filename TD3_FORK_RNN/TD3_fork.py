@@ -8,8 +8,9 @@ import gym
 import random
 from torch.distributions import Normal
 
+# https://github.com/ugurcanozalp/td3-sac-bipedal-walker-hardcore-v3/blob/main/td3_agent.py
 # https://github.com/vy007vikas/PyTorch-ActorCriticRL
-
+# https://github.com/honghaow/FORK/blob/master/TD3-FORK/TD3_FORK.py
 EPS = 0.003
 
 
@@ -21,17 +22,16 @@ class MyLSTM(nn.Module):
             hidden_size=hidden_size,
             batch_first=batch_first,
             bidirectional=False,
-            num_layers=1,
+            num_layers=2,
             dropout=0,
         )
         self.lstm.bias_hh_l0.data.fill_(
             -0.2
         )  # force lstm to output to depend more on last state at the initialization.
 
-    def forward(self, x):
-        x, (h_n, c_n) = self.lstm(x)
-        x = x[:, -1]
-        return x, (h_n, c_n)
+    def forward(self, observations, hidden=None):
+        summary, (hidden1, hidden2) = self.lstm(observations, hidden)
+        return summary[:, -1], (hidden1, hidden2)
 
 
 class Critic(nn.Module):
@@ -68,11 +68,53 @@ class Critic(nn.Module):
         """
         if state.dim() == 2:
             state = state.unsqueeze(1)  # Add sequence length dimension
-        s, _ = self.state_encoder(state)  # Unpack the tuple correctly
+        s, (y, z) = self.state_encoder(state)  # Unpack the tuple correctly
 
         x = torch.cat((s, action), dim=1)
         x = self.act(self.fc2(x))
         x = self.fc_out(x) * 10
+        return x
+
+
+class SysModel(nn.Module):
+
+    def __init__(self, state_dim=24, action_dim=4):
+        """
+        :param state_dim: Dimension of input state (int)
+        :param action_dim: Dimension of input action (int)
+        :return:
+        """
+        super(SysModel, self).__init__()
+
+        self.state_dim = state_dim
+        self.action_dim = action_dim
+
+        self.state_encoder = MyLSTM(
+            input_size=self.state_dim, hidden_size=96, batch_first=True
+        )
+
+        self.fc2 = nn.Linear(96 + self.action_dim, 192)
+        nn.init.xavier_uniform_(self.fc2.weight, gain=nn.init.calculate_gain("tanh"))
+
+        self.fc_out = nn.Linear(192, state_dim, bias=False)
+        nn.init.uniform_(self.fc_out.weight, -0.003, +0.003)
+
+        self.act = nn.Tanh()
+
+    def forward(self, state, action):
+        """
+        returns Value function Q(s,a) obtained from critic network
+        :param state: Input state (Torch Variable : [n,state_dim] )
+        :param action: Input Action (Torch Variable : [n,action_dim] )
+        :return: Value function : Q(S,a) (Torch Variable : [n,1] )
+        """
+        if state.dim() == 2:
+            state = state.unsqueeze(1)  # Add sequence length dimension
+        s, (y, z) = self.state_encoder(state)  # Unpack the tuple correctly
+
+        x = torch.cat((s, action), dim=1)
+        x = self.act(self.fc2(x))
+        x = self.fc_out(x)
         return x
 
 
@@ -138,6 +180,51 @@ class Actor(nn.Module):
             return actions
 
 
+class Sys_R(nn.Module):
+
+    def __init__(self, state_dim=24, action_dim=4):
+        """
+        :param state_dim: Dimension of input state (int)
+        :param action_dim: Dimension of input action (int)
+        :return:
+        """
+        super(Sys_R, self).__init__()
+
+        self.state_dim = state_dim
+        self.action_dim = action_dim
+
+        self.state_encoder = MyLSTM(
+            input_size=self.state_dim, hidden_size=96, batch_first=True
+        )
+
+        self.fc2 = nn.Linear(96 + 96 + self.action_dim, 192)
+        nn.init.xavier_uniform_(self.fc2.weight, gain=nn.init.calculate_gain("tanh"))
+
+        self.fc_out = nn.Linear(192, 1, bias=False)
+        nn.init.uniform_(self.fc_out.weight, -0.003, +0.003)
+
+        self.act = nn.Tanh()
+
+    def forward(self, state, next_state, action):
+        """
+        returns Value function Q(s,a) obtained from critic network
+        :param state: Input state (Torch Variable : [n,state_dim] )
+        :param action: Input Action (Torch Variable : [n,action_dim] )
+        :return: Value function : Q(S,a) (Torch Variable : [n,1] )
+        """
+        if state.dim() == 2:
+            state = state.unsqueeze(1)
+        if next_state.dim() == 2:
+            next_state = next_state.unsqueeze(1)
+        s, _ = self.state_encoder(state)
+        ns, _ = self.state_encoder(next_state)
+
+        x = torch.cat([s, ns, action], dim=1)
+        x = self.act(self.fc2(x))
+        x = self.fc_out(x) * 10
+        return x
+
+
 import torch
 from torch import optim
 import numpy as np
@@ -172,9 +259,10 @@ class TD3Agent:
         self.state_size = config.state_size
         self.action_size = config.action_size
         self.update_freq = update_freq
-
+        self.obs_lower_bound = config.min_state
+        self.obs_upper_bound = config.max_state
         self.learn_call = int(0)
-
+        self.update_sys = 0
         self.gamma = gamma
         self.tau = tau
         self.batch_size = config.batch_size
@@ -226,6 +314,12 @@ class TD3Agent:
             f"Number of paramters of Single Critic Net: {sum(p.numel() for p in self.train_critic_2.parameters())}"
         )
 
+        self.sysmodel = SysModel().to(self.device)
+        self.sysmodel_optimizer = torch.optim.Adam(self.sysmodel.parameters(), lr=3e-4)
+
+        self.sysr = Sys_R().to(self.device)
+        self.sysr_optimizer = torch.optim.Adam(self.sysr.parameters(), lr=3e-4)
+
         self.noise_generator = DecayingOrnsteinUhlenbeckNoise(
             mu=np.zeros(config.action_size),
             theta=4.0,
@@ -243,7 +337,11 @@ class TD3Agent:
             batch_size=self.batch_size,
             device=self.device,
         )
-
+        self.sysmodel_loss = 0
+        self.sysr_loss = 0
+        self.sys_weight = config.sys_weight
+        self.sys_weight2 = config.sys_weight2
+        self.sys_threshold = config.sys_threshold
         self.mse_loss = torch.nn.MSELoss()
 
     def learn_with_batches(self, state, action, reward, next_state, done):
@@ -272,6 +370,7 @@ class TD3Agent:
             Q_targets = rewards + (self.gamma * Q_targets_next * (1 - done))
             # Q_targets = rewards + (self.gamma * Q_targets_next)
 
+        # train the critic
         Q_expected_1 = self.train_critic_1(states, actions)
         critic_1_loss = self.mse_loss(Q_expected_1, Q_targets)
         # critic_1_loss = torch.nn.SmoothL1Loss()(Q_expected_1, Q_targets)
@@ -290,15 +389,67 @@ class TD3Agent:
         # torch.nn.utils.clip_grad_norm_(self.train_critic_2.parameters(), 1)
         self.critic_2_optim.step()
 
+        predict_next_state = self.sysmodel(states, actions)
+        predict_next_state = predict_next_state.clamp(
+            self.obs_lower_bound, self.obs_upper_bound
+        )
+        sysmodel_loss = F.smooth_l1_loss(predict_next_state, next_states.detach())
+
+        self.sysmodel_optimizer.zero_grad()
+        sysmodel_loss.backward()
+        self.sysmodel_optimizer.step()
+        self.sysmodel_loss = sysmodel_loss.item()
+
+        predict_reward = self.sysr(states, next_states, actions)
+        sysr_loss = F.mse_loss(predict_reward, rewards.detach())
+        self.sysr_optimizer.zero_grad()
+        sysr_loss.backward()
+        self.sysr_optimizer.step()
+        self.sysr_loss = sysr_loss.item()
+        s_flag = 1 if sysmodel_loss.item() < self.sys_threshold else 0
+
         if self.learn_call % self.update_freq == 0:
             self.learn_call = 0
             # update actor
             actions_pred = self.train_actor(states)
-            actor_loss = -self.train_critic_1(states, actions_pred).mean()
+            actor_loss1 = -self.train_critic_1(states, actions_pred).mean()
+            if s_flag == 1:
+                p_next_state = self.sysmodel(states, self.train_actor(states))
+                p_next_state = p_next_state.clamp(
+                    self.obs_lower_bound, self.obs_upper_bound
+                )
+                actions2 = self.train_actor(p_next_state.detach())
+                p_next_r = self.sysr(
+                    states, p_next_state.detach(), self.train_actor(states)
+                )
+                p_next_state2 = self.sysmodel(
+                    p_next_state, self.train_actor(p_next_state.detach())
+                )
+                p_next_state2 = p_next_state2.clamp(
+                    self.obs_lower_bound, self.obs_upper_bound
+                )
+                p_next_r2 = self.sysr(
+                    p_next_state.detach(),
+                    p_next_state2.detach(),
+                    self.train_actor(p_next_state.detach()),
+                )
+                actions3 = self.train_actor(p_next_state2.detach())
 
-            self.actor_optim.zero_grad(set_to_none=True)
+                actor_loss2 = self.train_critic_1(p_next_state2.detach(), actions3)
+                actor_loss3 = -(
+                    p_next_r + self.gamma * p_next_r2 + self.gamma**2 * actor_loss2
+                ).mean()
+                actor_loss = actor_loss1 + self.sys_weight * actor_loss3
+                self.update_sys += 1
+            else:
+
+                actor_loss = actor_loss1
+
+            # Optimize the train_actor
+            self.critic_1_optim.zero_grad()
+            self.sysmodel_optimizer.zero_grad()
+            self.actor_optim.zero_grad()
             actor_loss.backward()
-            # torch.nn.utils.clip_grad_norm_(self.train_actor.parameters(), 1)
             self.actor_optim.step()
 
             # using soft upates

@@ -23,9 +23,14 @@ class config:
         self.action_size = 0
         self.state_size = 0
         self.max_action = 0
+        self.min_state = 0
+        self.max_state = 0
         self.hidden_dim = 256
         self.lr = 3e-4
         self.update_after = 50
         self.update_every = 1
-        self.explore_duration = 100
-        self.test_steps = 100
+        self.explore_duration = 200
+        self.test_steps = 10
+        self.sys_weight = 0.5
+        self.sys_weight2 = 0.4
+        self.sys_threshold = 0.020

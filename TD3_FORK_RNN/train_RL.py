@@ -50,6 +50,8 @@ env_easy = gym.wrappers.RecordVideo(
 config.state_size = env.observation_space.shape[-1]
 config.action_size = env.action_space.shape[-1]
 config.max_action = float(env.action_space.high[0])
+config.max_state = float(env.observation_space.high[0])
+config.min_state = float(env.observation_space.low[0])
 # ==========================seeding
 torch.manual_seed(config.seed)
 env.seed(config.seed)
