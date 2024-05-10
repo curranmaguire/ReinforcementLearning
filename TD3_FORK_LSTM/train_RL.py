@@ -11,6 +11,7 @@ import torch.optim as optim
 import matplotlib.pyplot as plt
 import sys
 from pyvirtualdisplay import Display
+from collections import deque
 from TD3_fork import TD3_FORK
 
 print("----------Starting Training----------")
@@ -85,7 +86,8 @@ falling_down = 0
 
 max_episodes = 10000
 max_timesteps = 2000
-
+scores_deque = deque(maxlen=100)
+scores = []
 # training procedure:
 for episode in range(1, max_episodes + 1):
 
@@ -93,19 +95,20 @@ for episode in range(1, max_episodes + 1):
     episodic_reward = 0
     timestep = 0
     temp_replay_buffer = []
-    temp_action_buffer = np.zeros([max_timesteps, act_dim])
-    temp_observation_buffer = np.zeros([max_timesteps, state_dim])
-    for st in range(max_timesteps):
+    temp_action_buffer = np.zeros([max_timesteps+3, act_dim])
+    temp_observation_buffer = np.zeros([max_timesteps+3, state_dim])
+    temp_next_obs = np.zeros([max_timesteps+3, state_dim])
+    for st in range(max_timesteps-1):
 
-        action = agent.select_action(temp_observation_buffer) + np.random.normal(
+        action = agent.select_action(temp_observation_buffer, single=True) + np.random.normal(
             0, max_action * noise, size=action_dim
         )
         action = action.clip(env.action_space.low, env.action_space.high)
-        temp_observation_buffer[st] = state  # assign attention to the item
-        temp_action_buffer[st] = action
+        
         # take action in environment and get r and s'
         next_state, reward, done, _ = env.step(action)
         ep_reward += reward
+        
         # change the reward to be -5 instead of -100 and 5*reward for the other values
         episodic_reward += reward
         if reward == -100:
@@ -116,21 +119,22 @@ for episode in range(1, max_episodes + 1):
         else:
             add_reward = 0
             reward = 5 * reward
-
+        temp_observation_buffer[st] = state
+        temp_action_buffer[st] = action
+        temp_next_obs[st] = next_state
         temp_replay_buffer.append(
             (
                 temp_observation_buffer,
                 temp_action_buffer,
                 reward,
                 add_reward,
-                next_state,
+                temp_next_obs,
                 done,
+                st
             )
         )
-
-        state = next_state
-
-        env.render()
+        
+        #env.render()
 
         # stop iterating when the episode finished
         if done:
@@ -147,6 +151,15 @@ for episode in range(1, max_episodes + 1):
             break
         timestep += 1
         total_timesteps += 1
+    scores_deque.append(ep_reward)
+    avg_score_100 = np.mean(scores_deque)
+    state = next_state
+    print(
+    "\rEpisode {}\tAverage Score: {:.2f}\tScore: {:.2f}".format(
+        episode, avg_score_100, ep_reward
+    ),
+    end="",
+    )
     # Training agent only when new experiences are added to the replay buffer
     weight = 1 - np.clip(np.mean(ep_reward_list[-100:]) / 300, 0, 1)
     if totrain == 1:
