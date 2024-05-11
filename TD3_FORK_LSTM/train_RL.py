@@ -42,9 +42,9 @@ numtrainedexp = 0
 save_time = 0
 expcount = 0
 totrain = 0
-"""env = gym.wrappers.Monitor(
+env = gym.wrappers.Monitor(
     env, "./video", video_callable=lambda ep_id: ep_id % video_every == 0, force=True
-)"""
+)
 
 obs_dim = env.observation_space.shape[0]
 act_dim = env.action_space.shape[0]
@@ -78,7 +78,7 @@ state_dim = env.observation_space.shape[0]
 action_dim = env.action_space.shape[0]
 max_action = float(env.action_space.high[0])
 buffer_size = 1000000
-batch_size = 300
+batch_size = 600
 noise = 0.1
 max_steps = 2000
 falling_down = 0
@@ -95,9 +95,10 @@ for episode in range(1, max_episodes + 1):
     episodic_reward = 0
     timestep = 0
     temp_replay_buffer = []
-    temp_action_buffer = np.zeros([max_timesteps+3, act_dim])
-    temp_observation_buffer = np.zeros([max_timesteps+3, state_dim])
-    temp_next_obs = np.zeros([max_timesteps+3, state_dim])
+    temp_action_buffer = np.zeros([max_timesteps//2+2, act_dim])
+    temp_observation_buffer = np.zeros([max_timesteps//2+2, state_dim])
+    temp_next_obs = np.zeros([max_timesteps//2+2, state_dim])
+    skip_step = False
     for st in range(max_timesteps-1):
 
         action = agent.select_action(temp_observation_buffer, single=True) + np.random.normal(
@@ -119,9 +120,9 @@ for episode in range(1, max_episodes + 1):
         else:
             add_reward = 0
             reward = 5 * reward
-        temp_observation_buffer[st] = state
-        temp_action_buffer[st] = action
-        temp_next_obs[st] = next_state
+        temp_observation_buffer[st//2] = state
+        temp_action_buffer[st//2] = action
+        temp_next_obs[st//2] = next_state
         temp_replay_buffer.append(
             (
                 temp_observation_buffer,
@@ -130,9 +131,11 @@ for episode in range(1, max_episodes + 1):
                 add_reward,
                 temp_next_obs,
                 done,
-                st
+                st//2
             )
         )
+        
+
         
         #env.render()
 
@@ -197,6 +200,6 @@ for episode in range(1, max_episodes + 1):
         plt.ylabel("Episode reward")
         plt.savefig(f"plots/{episode}_episode_plot.png")
         plt.close()
-
+env.close()
 time_end = time.time()
 print(f"time taken to train: {time_end-time_start} seconds")

@@ -1,0 +1,39 @@
+/home2/cgmj52/ReinforcementLearning/TD3_FORK_LSTM/RL_Kernel/lib/python3.8/site-packages/gym/wrappers/monitor.py:31: UserWarning: The Monitor wrapper is being deprecated in favor of gym.wrappers.RecordVideo and gym.wrappers.RecordEpisodeStatistics (see https://github.com/openai/gym/issues/2297)
+  warnings.warn(
+----------Starting Training----------
+The environment has 24 observations and the agent can take 4 actions
+The device is: cuda
+It's recommended to train on the cpu for this
+Traceback (most recent call last):
+  File "train_RL.py", line 94, in <module>
+    state = env.reset()
+  File "/home2/cgmj52/ReinforcementLearning/TD3_FORK_LSTM/RL_Kernel/lib/python3.8/site-packages/gym/wrappers/monitor.py", line 58, in reset
+    self._after_reset(observation)
+  File "/home2/cgmj52/ReinforcementLearning/TD3_FORK_LSTM/RL_Kernel/lib/python3.8/site-packages/gym/wrappers/monitor.py", line 243, in _after_reset
+    self.reset_video_recorder()
+  File "/home2/cgmj52/ReinforcementLearning/TD3_FORK_LSTM/RL_Kernel/lib/python3.8/site-packages/gym/wrappers/monitor.py", line 269, in reset_video_recorder
+    self.video_recorder.capture_frame()
+  File "/home2/cgmj52/ReinforcementLearning/TD3_FORK_LSTM/RL_Kernel/lib/python3.8/site-packages/gym/wrappers/monitoring/video_recorder.py", line 136, in capture_frame
+    frame = self.env.render(mode=render_mode)
+  File "/home2/cgmj52/ReinforcementLearning/TD3_FORK_LSTM/RL_Kernel/lib/python3.8/site-packages/gym/core.py", line 254, in render
+    return self.env.render(mode, **kwargs)
+  File "/home2/cgmj52/ReinforcementLearning/TD3_FORK_LSTM/RL_Kernel/lib/python3.8/site-packages/gym/envs/box2d/bipedal_walker.py", line 493, in render
+    from gym.envs.classic_control import rendering
+  File "/home2/cgmj52/ReinforcementLearning/TD3_FORK_LSTM/RL_Kernel/lib/python3.8/site-packages/gym/envs/classic_control/rendering.py", line 27, in <module>
+    from pyglet.gl import *
+  File "/home2/cgmj52/ReinforcementLearning/TD3_FORK_LSTM/RL_Kernel/lib/python3.8/site-packages/pyglet/gl/__init__.py", line 232, in <module>
+    import pyglet.window
+  File "/home2/cgmj52/ReinforcementLearning/TD3_FORK_LSTM/RL_Kernel/lib/python3.8/site-packages/pyglet/window/__init__.py", line 1919, in <module>
+    gl._create_shadow_window()
+  File "/home2/cgmj52/ReinforcementLearning/TD3_FORK_LSTM/RL_Kernel/lib/python3.8/site-packages/pyglet/gl/__init__.py", line 206, in _create_shadow_window
+    _shadow_window = Window(width=1, height=1, visible=False)
+  File "/home2/cgmj52/ReinforcementLearning/TD3_FORK_LSTM/RL_Kernel/lib/python3.8/site-packages/pyglet/window/xlib/__init__.py", line 171, in __init__
+    super(XlibWindow, self).__init__(*args, **kwargs)
+  File "/home2/cgmj52/ReinforcementLearning/TD3_FORK_LSTM/RL_Kernel/lib/python3.8/site-packages/pyglet/window/__init__.py", line 591, in __init__
+    display = pyglet.canvas.get_display()
+  File "/home2/cgmj52/ReinforcementLearning/TD3_FORK_LSTM/RL_Kernel/lib/python3.8/site-packages/pyglet/canvas/__init__.py", line 94, in get_display
+    return Display()
+  File "/home2/cgmj52/ReinforcementLearning/TD3_FORK_LSTM/RL_Kernel/lib/python3.8/site-packages/pyglet/canvas/xlib.py", line 123, in __init__
+    raise NoSuchDisplayException('Cannot connect to "%s"' % name)
+pyglet.canvas.xlib.NoSuchDisplayException: Cannot connect to "None"
+DeprecationWarning: 'source deactivate' is deprecated. Use 'conda deactivate'.
