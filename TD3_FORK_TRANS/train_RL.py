@@ -14,10 +14,8 @@ import sys
 from pyvirtualdisplay import Display
 from collections import deque
 from TD3_fork import TD3_FORK
-
+torch.amp.autocast(device_type='cuda', dtype=torch.float16)
 print("----------Starting Training----------")
-
-#############params############
 lr = 4e-4
 momentum = 0.9
 discount = 0.98

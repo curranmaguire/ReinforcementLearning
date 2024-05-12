@@ -3,12 +3,11 @@ import torch
 
 class config:
     def __init__(self):
-
-        self.max_episodes = 5000
-        self.batch_size = 100
+        self.max_episodes = 3700
         self.seed = 42
         self.video_every = 100  # videos can take a very long time to render so only do it every N episodes
         self.plot_interval = 10
+        self.batch_size = 500
         if torch.cuda.is_available():
             self.device = torch.device("cuda")
         if torch.backends.mps.is_available():
@@ -16,7 +15,7 @@ class config:
         else:
             self.device = torch.device("cpu")
         self.buffer_size = 1000000
-        self.batch_size = 300
+        
         self.noise = 0.1
         self.max_timesteps = 2000
         self.easy_ep_num = 100

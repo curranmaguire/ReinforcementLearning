@@ -133,8 +133,8 @@ class TD3_FORK:
             "action_size": self.env.action_space.shape[0],
             "seed": 42,
         }
-        self.actor = Actor(**params).to(self.device)
-        self.actor_target = Actor(**params).to(self.device)
+        self.actor = Actor(**params).to(self.device).train()
+        self.actor_target = Actor(**params).to(self.device).train()
 
     def create_critic(self):
         params = {
@@ -142,51 +142,21 @@ class TD3_FORK:
             "action_size": self.env.action_space.shape[0],
             "seed": 42,
         }
-        self.critic = Critic(**params).to(self.device)
-        self.critic_target = Critic(**params).to(self.device)
+        self.critic = Critic(**params).to(self.device).train()
+        self.critic_target = Critic(**params).to(self.device).train()
 
     def create_sysmodel(self):
         params = {
             "state_size": self.env.observation_space.shape[0],
             "action_size": self.env.action_space.shape[0],
         }
-        self.sysmodel = SysModel(**params).to(self.device)
+        self.sysmodel = SysModel(**params).to(self.device).train()
 
     def set_weights(self):
         self.actor_target.load_state_dict(self.actor.state_dict())
         self.critic_target.load_state_dict(self.critic.state_dict())
 
-    def load_weight(self):
-        self.actor.load_state_dict(
-            torch.load(
-                "/content/drive/My Drive/bipedal/weights/hardcore/actor.pth",
-                map_location=self.device,
-            )
-        )
-        self.critic.load_state_dict(
-            torch.load(
-                "/content/drive/My Drive/bipedal/weights/hardcore/critic.pth",
-                map_location=self.device,
-            )
-        )
-        self.actor_target.load_state_dict(
-            torch.load(
-                "/content/drive/My Drive/bipedal/weights/hardcore/actor_t.pth",
-                map_location=self.device,
-            )
-        )
-        self.critic_target.load_state_dict(
-            torch.load(
-                "/content/drive/My Drive/bipedal/weights/hardcore/critic_t.pth",
-                map_location=self.device,
-            )
-        )
-        self.sysmodel.load_state_dict(
-            torch.load(
-                "/content/drive/My Drive/bipedal/weights/hardcore/sysmodel.pth",
-                map_location=self.device,
-            )
-        )
+    
 
     def add_to_replay_memory(self, transition, buffername):
         # add samples to replay memory

@@ -12,100 +12,122 @@ import os
 import time
 import copy
 from torch.nn import TransformerEncoder, TransformerEncoderLayer
+import math
+
+class PositionalEncoding(nn.Module):
+    def __init__(self, d_model, dropout=0.1, max_len=5000):
+        super(PositionalEncoding, self).__init__()
+        self.dropout = nn.Dropout(p=dropout)
+        pe = torch.zeros(max_len, d_model)
+        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+        pe = pe.unsqueeze(0).transpose(0, 1)
+        self.register_buffer('pe', pe)
+
+    def forward(self, x):
+        x = x + self.pe[:x.size(0), :]
+        return self.dropout(x)
+
 class Actor(nn.Module):
-    def __init__(
-        self, state_size=24, action_size=4, seed=42, hidden_size=64, num_layers=1
-    ):
+    def __init__(self, state_size=24, action_size=4, seed=42, hidden_size=64, num_layers=1, num_heads=4):
         super(Actor, self).__init__()
         self.seed = torch.manual_seed(seed)
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.device = torch.device('cuda')
-        self.lstm = nn.LSTM(state_size, hidden_size, num_layers, batch_first=True)
-        self.lstm.bias_hh_l0.data.fill_(-0.2) # force lstm to output to depend more on last state at the initialization.
+        self.embedding = nn.Linear(state_size, hidden_size)
+        self.positional_encoding = PositionalEncoding(hidden_size)
+        encoder_layer = TransformerEncoderLayer(hidden_size, num_heads, hidden_size, dropout=0.1)
+        self.transformer_encoder = TransformerEncoder(encoder_layer, num_layers)
         self.fc1 = nn.Linear(hidden_size, 400)
         self.fc2 = nn.Linear(400, 300)
         self.fc3 = nn.Linear(300, action_size)
 
     def forward(self, state, timesteps=None, action=None, single=False):
-        """Build an actor (policy) network that maps states -> actions."""
-            
-        out, (hidden_state, cell_state) = self.lstm(state)
-        x = F.relu(self.fc1(out[:, -1, :]))
+        x = self.embedding(state)
+        x = self.positional_encoding(x)
+        x = self.transformer_encoder(x)
+        x = x[:, -1, :]  # Take the last time step's output
+        x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
-       
         if single:
-            return F.torch.tanh(self.fc3(x))
+            return torch.tanh(self.fc3(x))
         else:
             output = torch.clone(action)
             for i in range(len(timesteps)):
-                timestep = timesteps[i].item()  # Get the scalar value of the timestep
-                if timestep + 1 < output.size(1):  # Check if the index is within the valid range
-                    output[i, timestep + 1] = F.torch.tanh(self.fc3(x[i]))
-                return output
-
+                timestep = timesteps[i].item()
+                if timestep + 1 < output.size(1):
+                    output[i, timestep + 1] = torch.tanh(self.fc3(x[i]))
+            return output
 
 class Critic(nn.Module):
-    def __init__(self, state_size, action_size, seed=42, hidden_size=64, num_layers=1):
+    def __init__(self, state_size, action_size, seed=42, hidden_size=64, num_layers=1, num_heads=4):
         super(Critic, self).__init__()
         self.seed = torch.manual_seed(seed)
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.device = torch.device('cuda')
-        self.lstm = nn.LSTM(
-        
-            state_size, hidden_size, num_layers, batch_first=True
-        )
-        self.lstm.bias_hh_l0.data.fill_(-0.2) # force lstm to output to depend more on last state at the initialization.
-        self.fc1 = nn.Linear(hidden_size + action_size, 200)
-        self.fc2 = nn.Linear(200, 100)
-        self.fc3 = nn.Linear(100, 1)
+        self.embedding = nn.Linear(state_size, hidden_size)
+        self.positional_encoding = PositionalEncoding(hidden_size)
+        encoder_layer = TransformerEncoderLayer(hidden_size, num_heads, hidden_size, dropout=0.1)
+        self.transformer_encoder = TransformerEncoder(encoder_layer, num_layers)
+        self.fc1 = nn.Linear(hidden_size + action_size, 400)
+        self.fc2 = nn.Linear(400, 300)
+        self.fc3 = nn.Linear(300, 1)
 
     def forward(self, state, action):
-
-        out, (hidden_size, cell_state) = self.lstm(state)
-        xa = torch.cat([out[:,-1], action[:,-1]], dim=1)
-
         
-        
-        x = F.relu(self.fc1(xa))
+        xa = self.embedding(state)
+        xa = self.positional_encoding(xa)
+        xa = self.transformer_encoder(xa)
+        x = torch.cat([xa[:,-1], action[:,-1]], dim=1)
+          # Take the last time step's output
+        x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
         return self.fc3(x)
 
 class SysModel(nn.Module):
-    def __init__(self, state_size, action_size, seed=42, hidden_size=64, num_layers=1):
+    def __init__(self, state_size, action_size, seed=42, hidden_size=64, num_layers=1, num_heads=4):
         super(SysModel, self).__init__()
         self.seed = torch.manual_seed(seed)
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.device = torch.device('cuda')
-        self.lstm = nn.LSTM(
-            state_size, hidden_size, num_layers, batch_first=True
-        )
-        self.lstm.bias_hh_l0.data.fill_(-0.2) # force lstm to output to depend more on last state at the initialization.
-        self.fc1 = nn.Linear(hidden_size + action_size, 200)
-        self.fc2 = nn.Linear(200, 100)
-        self.fc3 = nn.Linear(100, state_size)
+        self.fc1 = nn.Linear(state_size + action_size, 400)
+
+        self.fc2 = nn.Linear(400, 300)
+        self.fc3 = nn.Linear(300, state_size)
 
     def forward(self, state, action, timesteps=None, single=False):
-
-        out, (hidden_state, cell_state) = self.lstm(state)
-        xa = torch.cat([out[:,-1], action[:,-1]], dim=-1)
-
-        
-        
+        xa = torch.cat([state[:, -1], action[:,-1]], dim=-1)
         x = F.relu(self.fc1(xa))
         x = F.relu(self.fc2(x))
         if not single:
             output = torch.clone(state)
-            for i in range(len(timesteps)):
-                timestep = timesteps[i].item()  # Get the scalar value of the timestep
-                if timestep + 1 < output.size(1):  # Check if the index is within the valid range
-                    output[i, timestep + 1] = self.fc3(x[i])  # Reshape the output to match the state dimensions
             
+            for i in range(len(timesteps)):
+                timestep = timesteps[i].item()
+                if timestep + 1 < output.size(1):
+                    output[i, timestep + 1] = self.fc3(x[i])
             return output
         else:
             return self.fc3(x)
+
+
+    def init_hidden(self, shape):
+        if shape == 3:
+            return (
+                torch.zeros(self.num_layers, shape, self.hidden_size).to(self.device),
+                torch.zeros(self.num_layers, shape, self.hidden_size).to(self.device),
+            )
+        elif shape == 2:
+            return (
+                torch.zeros(self.num_layers, self.hidden_size).to(self.device),
+                torch.zeros(self.num_layers, self.hidden_size).to(self.device),
+            )
+        else: print('tensor shape error')
 
 class TD3_FORK:
     def __init__(
@@ -113,10 +135,10 @@ class TD3_FORK:
         name,
         env,
         load=False,
-        gamma=0.98,  # discount factor
-        lr_actor=4e-4,
-        lr_critic=4e-4,
-        lr_sysmodel=4e-4,
+        gamma=0.99,  # discount factor
+        lr_actor=1.5e-4,
+        lr_critic=1.5e-4,
+        lr_sysmodel=1.5e-4,
         batch_size=100,
         buffer_capacity=1000000,
         tau=0.02,  # target network update factor
@@ -132,7 +154,7 @@ class TD3_FORK:
         self.create_actor()
         self.create_critic()
         self.create_sysmodel()
-        self.act_opt = optim.Adam(self.actor.parameters(), lr=lr_actor, weight_decay=1e-2)
+        self.act_opt = optim.Adam(self.actor.parameters(), lr=lr_actor)
         self.crt_opt1 = optim.Adam(self.critic1.parameters(), lr=lr_critic, weight_decay=1e-2)
         self.crt_opt2 = optim.Adam(self.critic2.parameters(), lr=lr_critic, weight_decay=1e-2)
         self.sys_opt = optim.Adam(self.sysmodel.parameters(), lr=lr_sysmodel, weight_decay=1e-2)
