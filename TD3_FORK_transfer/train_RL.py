@@ -13,16 +13,15 @@ import sys
 from pyvirtualdisplay import Display
 from TD3_fork import TD3_FORK
 from config import config
-
 print("----------Starting Training----------")
 
-
+config = config()
 env = gym.make("BipedalWalkerHardcore-v3")
 env_easy = gym.make("BipedalWalker-v3")
-agent = TD3_FORK("Bipedalhardcore", env, config.batch_size=config.config.batch_size)
+agent = TD3_FORK("Bipedalhardcore", env, batch_size=config.batch_size)
 
 # ============================variables
-config = config()
+
 start_timestep = 0  # time_step to select action based on Actor
 time_start = time.time()  # Init start time
 ep_reward_list = []
@@ -34,7 +33,7 @@ save_time = 0
 expcount = 0
 totrain = 0
 # ===========================wrappers
-env = gym.wrappers.Monitor(
+'''env = gym.wrappers.Monitor(
     env,
     "./TD3_FORK_transfer/video",
     video_callable=lambda ep_id: ep_id % config.video_every == 0,
@@ -45,7 +44,7 @@ env_easy = gym.wrappers.Monitor(
     "./TD3_FORK_transfer/video_easy",
     video_callable=lambda ep_id: ep_id % config.video_every == 0,
     force=True,
-)
+)'''
 
 obs_dim = env.observation_space.shape[0]
 act_dim = env.action_space.shape[0]
@@ -61,7 +60,7 @@ env_easy.action_space.seed(config.seed)
 ep_reward = 0
 reward_list = []
 plot_data = []
-log_f = open("TD3_FORK_RNN/agent-log.txt", "w+")
+log_f = open("agent-log.txt", "w+")
 
 # =========================variables for td3
 state_dim = env.observation_space.shape[0]
@@ -106,7 +105,7 @@ for episode in range(1, config.max_episodes + 1):
 
             state = next_state
 
-            env_easy.render()
+            #env_easy.render()
 
             # stop iterating when the episode finished
             if done:
@@ -164,7 +163,7 @@ for episode in range(1, config.max_episodes + 1):
             plt.xlabel("Episode number")
             plt.ylabel("Episode reward")
             plt.savefig(
-                f"{os.getcwd()}/TD3_FORK_RNN/plots/{episode}_episode_plot.png"
+                f"plots/{episode}_episode_plot.png"
             )
             plt.close()
     else:
@@ -201,7 +200,7 @@ for episode in range(1, config.max_episodes + 1):
 
             state = next_state
 
-            env.render()
+            #env.render()
 
             # stop iterating when the episode finished
             if done:
@@ -259,7 +258,7 @@ for episode in range(1, config.max_episodes + 1):
             plt.xlabel("Episode number")
             plt.ylabel("Episode reward")
             plt.savefig(
-                f"{os.getcwd()}/TD3_FORK_transfer/plots/{episode}_episode_plot.png"
+                f"plots/{episode}_episode_plot.png"
             )
             plt.close()
 
